@@ -8,11 +8,11 @@ import itertools
 import os
 import glob
 
-try:
-    import rospy
-    import rosbag
-except ImportError:
-    raise ImportError("Failed to import rospy, try sourcing workspace")
+#  try:
+#  import rospy
+#  import rosbag
+#  except ImportError:
+#  raise ImportError("Failed to import rospy, try sourcing workspace")
 
 
 class VideoStream(ABC):
