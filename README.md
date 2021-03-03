@@ -11,12 +11,33 @@
 └── slam                         # Uses center points of objects to map + localize
 
 ```
+
+
+## Important ROS Topics
+
+```bash
+- /seg/prediction                   # Model output
+- /video_stream/rgb_img             # RGB input image
+- /video_stream/depth_img           # Depth image input
+- /inference/obj_inference          # Distances, relative positions of objects
+```
+
 ## SLAM Library:
 
 [nwang57/FastSLAM](https://github.com/nwang57/FastSLAM)
 
 
 ## Semantic Segmentation
+
+
+## Output
+
+ - label
+ - distance
+ - Relative location from cane
+ - class probability
+ - obj. width
+
 
 
 

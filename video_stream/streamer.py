@@ -1,14 +1,16 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
-from abs import ABC, abstractmethod
-from typing import Optional, Tuple, Any
+from abc import ABC, abstractmethod
+from typing import Optional, Tuple, Any, Union
 import warnings
+import itertools
+import os
+import glob
 
 try:
     import rospy
     import rosbag
-    import itertools
 except ImportError:
     raise ImportError("Failed to import rospy, try sourcing workspace")
 
@@ -35,6 +37,89 @@ class VideoStream(ABC):
         ...
 
 
+class RawImages(VideoStream):
+    r"""Stream input from two seperate folders, of depth and rgb images"""
+
+    def __init__(self, rgb_dir: str, depth_dir: str, visualize: bool = False):
+        if os.path.isdir(rgb_dir) and os.path.isdir(depth_dir):
+            self.rgb_dir = rgb_dir
+            self.depth_dir = depth_dir
+        else:
+            raise ValueError(
+                f"RGB or Depth directory not found: \n\t{rgb_dir}\n\t{depth_dir}"
+            )
+        self.index = 1
+        self.length = min(
+            len(glob.glob1(depth_dir, "*.png")), len(glob.glob1(rgb_dir, "*.png"))
+        )
+
+        if visualize:
+            self.input_viz_win = cv2.namedWindow("Input Stream", cv2.WINDOW_AUTOSIZE)
+
+    def __del__(self):
+        cv2.destroyWindow("Input Stream")
+
+    def viz(self, rgb, depth):
+        cv2.imshow(
+            "Input Stream",
+            np.concat(
+                (
+                    rgb,
+                    np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8),
+                    cv2.applyColorMap(
+                        cv2.normalize(
+                            depth, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
+                        ),
+                        cv2.COLORMAP_JET,
+                    ),
+                ),
+                1,
+            ),
+        )
+
+    def __len__(self) -> int:
+        return self.length
+
+    def __getitem__(
+        self,
+        index: int,
+    ) -> Union[None, Tuple[Any, ...]]:
+
+        if index >= self.length:
+            return None
+
+        rgb = cv2.imread(
+            self.rgb_dir + "/frame%06i.png" % self.index,
+            cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH,
+        )
+
+        depth = cv2.imread(
+            self.depth_dir + "/frame%06i.png" % self.index,
+            cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH,
+        )
+        self.index += 1
+
+        # If one of the files did not exist
+        if rgb is None or depth is None:
+            return self.__getitem__(self.index)
+
+        else:
+            return (rgb, depth)
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def get_frame(self) -> Union[None, Tuple[Any, ...]]:
+        self.index += 1
+        return self.__getitem__(self.index)
+
+    def wait_for_frame(self) -> Union[None, Tuple[Any, ...]]:
+        return self.get_frame()
+
+
 class RealSense(VideoStream):
     r"""RealSense Camera input, either streaming directly from the cam or using the intel bagfile"""
 
@@ -56,6 +141,27 @@ class RealSense(VideoStream):
         # Create cv2 window if we are visualizing input stream
         if visualize:
             self.input_viz_win = cv2.namedWindow("Input Stream", cv2.WINDOW_AUTOSIZE)
+
+    def __del__(self):
+        cv2.destroyWindow("Input Stream")
+
+    def viz(self, rgb, depth):
+        cv2.imshow(
+            "Input Stream",
+            np.concat(
+                (
+                    rgb,
+                    np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8),
+                    cv2.applyColorMap(
+                        cv2.normalize(
+                            depth, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
+                        ),
+                        cv2.COLORMAP_JET,
+                    ),
+                ),
+                1,
+            ),
+        )
 
     def start(self) -> None:
         """Start stream"""
@@ -119,6 +225,15 @@ class ROSBag(VideoStream):
         if visualize:
             self.input_viz_win = cv2.namedWindow("Input Stream", cv2.WINDOW_AUTOSIZE)
 
+    def __del__(self):
+        cv2.destroyWindow("Input Stream")
+
+    def viz(self, img):
+        cv2.imshow(
+            "Input Stream",
+            np.concat(img, 1),
+        )
+
     def __len__(self) -> int:
         return self.length
 
@@ -127,8 +242,12 @@ class ROSBag(VideoStream):
         index: int,
     ) -> Tuple[Any, ...]:
 
+        if index >= self.length:
+            return None
+
         return_list = []
         for gen in self.generators:
+            # This snippet of code just indexes a generator
             return_list.append(next(itertools.islice(gen, index, None)))
         return tuple(return_list)
 
