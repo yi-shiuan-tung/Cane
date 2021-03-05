@@ -1,0 +1,28 @@
+---
+######################
+# Video Stream Config
+######################
+visualize: True
+### RosBag Input
+video_stream: "ROSBag"
+bag_file: "./segmentation/bags/rgbd.bag"
+topics: 
+    - "/camera/depth/image_rect_raw/compressed"
+    - "/camera/color/image_raw/compressed"
+
+
+### Intel Realsense input
+# video_stream: "RealSense"
+
+
+### directory of images input
+# video_stream: "RawImages"
+rgb_dir: "./segmentation/rgbd_output/RGB"
+depth_dir: "./segmentation/rgbd_output/depth"
+
+
+############################
+# Segmentation Model Config
+############################
+segmentation_model: "detectron"
+
