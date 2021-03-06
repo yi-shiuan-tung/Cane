@@ -1,5 +1,15 @@
 
 
+# Object Inference
+Determine object distances and relative positions given masks
+
+
+## Object ROS Message
+
+```bash
+geometry_msgs/Point[] obj_positions    # relative position vectors, norm is distance
+string[] labels                        # labels of objects
+```
 
 
 ## Finding size of object given the distance
