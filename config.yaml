@@ -26,3 +26,6 @@ depth_dir: "./segmentation/rgbd_output/depth"
 ############################
 segmentation_model: "detectron"
 
+model_weights: "/home/epiphyte/Documents/Research/cane/segmentation/detectron2/weights/model_final_a54504.pkl"
+
+model_config: "/home/epiphyte/Documents/Research/cane/segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
