@@ -1,22 +1,19 @@
 #!/usr/bin/env  python
-import pyrealsense2 as rs
-import numpy as np
-import cv2
-import time
-from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Any, Union
-import warnings
+import glob
 import itertools
 import os
-import glob
+import time
+import warnings
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Tuple, Union
 
-try:
-    import rospy
-    import rosbag
-    from sensor_msgs.msg import Image
-    from cv_bridge import CvBridge
-except ImportError:
-    raise ImportError("Failed to import rospy, try sourcing workspace")
+import cv2
+import numpy as np
+import pyrealsense2 as rs
+import rosbag
+import rospy
+from cv_bridge import CvBridge
+from video_stream.msg import Stream
 
 
 class VideoStream(ABC):
@@ -69,8 +66,9 @@ class RawImages(VideoStream):
         )
 
         # Image publishers
-        self.rgb_pub = rospy.Publisher("/video_stream/rgb_img", Image, queue_size=2)
-        self.depth_pub = rospy.Publisher("/video_stream/depth_img", Image, queue_size=2)
+        self.input_pub = rospy.Publisher(
+            "/video_stream/input_imgs", Stream, queue_size=2
+        )
 
         if visualize:
             self.input_viz_win = cv2.namedWindow("Input Stream")
@@ -142,8 +140,10 @@ class RawImages(VideoStream):
         while not rospy.is_shutdown():
             start_t = time.time()
             rgb, dep = self.wait_for_frame()
-            self.rgb_pub.publish(rgb)
-            self.depth_pub.publish(dep)
+            msg = Stream()
+            msg.rgb = rgb.message
+            msg.depth_map = dep.message
+            self.input_pub.publish(msg)
             time.sleep(self.publish_rate - start_t)
 
 
@@ -169,8 +169,9 @@ class RealSense(VideoStream):
         # TODO: Change parameters of this
         self.config.enable_stream(rs.stream.depth, rs.format.z16, 30)
 
-        self.rgb_pub = rospy.Publisher("/video_stream/rgb_img", Image, queue_size=2)
-        self.depth_pub = rospy.Publisher("/video_stream/depth_img", Image, queue_size=2)
+        self.input_pub = rospy.Publisher(
+            "/video_stream/input_imgs", Stream, queue_size=2
+        )
         # Create cv2 window if we are visualizing input stream
         if visualize:
             self.input_viz_win = cv2.namedWindow("Input Stream")
@@ -214,8 +215,10 @@ class RealSense(VideoStream):
         while not rospy.is_shutdown():
             start_t = time.time()
             rgb, dep = self.wait_for_frame()
-            self.rgb_pub.publish(rgb)
-            self.depth_pub.publish(dep)
+            msg = Stream()
+            msg.rgb = rgb.message
+            msg.depth_map = dep.message
+            self.input_pub.publish(msg)
             time.sleep(self.publish_rate - start_t)
 
 
@@ -261,8 +264,9 @@ class ROSBag(VideoStream):
 
             self.generators.append(self.bag.read_messages(topics=topic))
 
-        self.rgb_pub = rospy.Publisher("/video_stream/rgb_img", Image, queue_size=2)
-        self.depth_pub = rospy.Publisher("/video_stream/depth_img", Image, queue_size=2)
+        self.input_pub = rospy.Publisher(
+            "/video_stream/input_imgs", Stream, queue_size=2
+        )
         # Create cv2 window if we are visualizing input stream
         if visualize:
             self.input_viz_win = cv2.namedWindow("Input Stream")
@@ -324,10 +328,13 @@ class ROSBag(VideoStream):
 
     def loop(self) -> None:
         while not rospy.is_shutdown():
+            print("video_stream publishing image")
             start_t = time.time()
             rgb, dep = self.wait_for_frame()
-            self.rgb_pub.publish(rgb.message)
-            self.depth_pub.publish(dep.message)
+            msg = Stream()
+            msg.rgb = rgb.message
+            msg.depth_map = dep.message
+            self.input_pub.publish(msg)
             time.sleep(self.publish_rate - (time.time() - start_t))
 
 
@@ -341,7 +348,12 @@ def main():
         bag_file = rospy.get_param("bag_file")
         publish_rate = rospy.get_param("publish_rate")
         topics = rospy.get_param("topics")
-        video_stream = ROSBag(input_file=bag_file, topics=topics, visualize=visualize)
+        video_stream = ROSBag(
+            input_file=bag_file,
+            topics=topics,
+            visualize=visualize,
+            publish_rate=publish_rate,
+        )
 
     elif stream_type.lower() == "realsense":
         video_stream = RealSense(visualize=visualize)

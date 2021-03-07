@@ -1,18 +1,18 @@
+#!/usr/bin/env python
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import rospy
-import segmentation_models_pytorch as smp
+#  import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 from cv_bridge import CvBridge
+from detectron2.config import get_cfg
+from detectron2.engine import DefaultPredictor
+from segmentation.msg import Prediction
 from torch import Tensor
 from video_stream.msg import Stream
-
-from segmentation.detectron2.detectron2.config import get_cfg
-from segmentation.detectron2.detectron2.engine import DefaultPredictor
-from segmentation.msg import Prediction
 
 if TYPE_CHECKING:
     from segmentation.detectron2.detectron2.config.config import CfgNode
@@ -65,7 +65,7 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         self,
         model_weights: str,
         config_file: str,
-    ) -> CfgNode:
+    ) -> "CfgNode":
         """
         Setup config and return predictor. See config/defaults.py for more options
         """
@@ -118,7 +118,7 @@ class DetectronModel(DefaultPredictor, AbstractModel):
             - np.uint8: New mask compressed to be (H, W, 1), where each different object found
             has it's unique integer
         """
-        compressed_mask = np.zeros((mask.shape[1], mask.shape[2], 1), dtype=np.uint8)
+        compressed_mask = np.zeros((mask.shape[1], mask.shape[2]), dtype=np.uint8)
         for i in range(len(mask)):
             compressed_mask += mask[i] * (i + 1)
         return compressed_mask
@@ -129,7 +129,7 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         pred = self.forward(x)["instances"]
 
         centers = pred.pred_boxes.get_centers().cpu().numpy()
-        mask = self.format_mask(pred.pred_masks.cpu().numpy())
+        mask = self.format_mask(pred.pred_masks.cpu().numpy().astype(np.uint8))
         labels = self.get_class_names(pred.pred_classes)
         scores = pred.scores.cpu().numpy()
 
@@ -156,7 +156,9 @@ class SegmentationModel(nn.Module):
             self.model = DetectronModel(model_weights=weights, config_file=config_file)
 
         self.pred_pub = rospy.Publisher("/seg/prediction", Prediction, queue_size=3)
-        self.input_sub = rospy.Subscriber("/seg/prediction", Prediction, self.callback)
+        self.input_sub = rospy.Subscriber(
+            "/video_stream/input_imgs", Stream, self.callback
+        )
         self.cv_bridge = CvBridge()
 
     def callback(self, input_imgs: Stream) -> None:
@@ -164,7 +166,11 @@ class SegmentationModel(nn.Module):
         Args:
             input_imgs (video_stream.msg.Stream): Custom ROS message type, given by video_stream node
         """
-        rgb_img = torch.Tensor(Stream.rgb)
+        print("SegmentationModel recieved message")
+        rgb_img = self.cv_bridge.imgmsg_to_cv2(
+            input_imgs.rgb,
+            desired_encoding="passthrough",
+        )
         (mask, centers, labels, scores) = self.model.full_output(rgb_img)
 
         pub_img = Prediction()
@@ -175,3 +181,17 @@ class SegmentationModel(nn.Module):
         pub_img.labels = labels
 
         self.pred_pub.publish(pub_img)
+
+
+if __name__ == "__main__":
+    rospy.init_node("segmentation")
+    weights = rospy.get_param("model_weights")
+    model_type = rospy.get_param("segmentation_model")
+    config = rospy.get_param("model_config")
+
+    seg_model = SegmentationModel(
+        model_name=model_type, weights=weights, config_file=config
+    )
+
+    while not rospy.is_shutdown():
+        rospy.spin()

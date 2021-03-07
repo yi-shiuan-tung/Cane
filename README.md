@@ -52,6 +52,14 @@
 
 ## Building
 
+### Install Detectron2
+ 
+```bash
+$ git clone https://github.com/facebookresearch/detectron2.git && cd detectron2
+$ python setup.py install
+```
+
+### Building project
 ```bash
 ### SOURCE ROS FIRST ###
 

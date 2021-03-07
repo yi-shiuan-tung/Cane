@@ -5,11 +5,12 @@
 visualize: True
 ### RosBag Input
 video_stream: "ROSBag"
-bag_file: "./segmentation/bags/rgbd.bag"
+bag_file: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/bags/rgbd.bag"
 topics: 
-    - "/camera/depth/image_rect_raw/compressed"
-    - "/camera/color/image_raw/compressed"
+    - "/camera/color/image_raw"
+    - "/camera/depth/image_rect_raw"
 
+publish_rate: 2
 
 ### Intel Realsense input
 # video_stream: "RealSense"
@@ -17,8 +18,8 @@ topics:
 
 ### directory of images input
 # video_stream: "RawImages"
-rgb_dir: "./segmentation/rgbd_output/RGB"
-depth_dir: "./segmentation/rgbd_output/depth"
+rgb_dir: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/rgbd_output/RGB"
+depth_dir: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/rgbd_output/depth"
 
 
 ############################

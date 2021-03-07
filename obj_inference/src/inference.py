@@ -1,15 +1,14 @@
-import torch
+#!/usr/bin/env python
+from typing import Tuple, Union
+
 import numpy as np
-from scipy import stats
-from scipy import ndimage
-from pandas import unique
-
 import rospy
-from sensor_msgs.msg import Image
-from typing import Union, Tuple
-
+import torch
+from obj_inference.msg import Objects
+from pandas import unique
+from scipy import ndimage, stats
 from segmentation.msg import Prediction
-from obj_inference.msg import Object
+from sensor_msgs.msg import Image
 
 REALSENSE_FOCAL_LENGTH = 1.93  # millimeters
 REALSENSE_SENSOR_HEIGHT_MM = 2.454  # millimeters
@@ -22,7 +21,7 @@ class Distance_Inference:
     def __init__(self):
         self.input_sub = rospy.Subscriber("/seg/prediction", Prediction, self.callback)
         self.inference_pub = rospy.Publisher(
-            "/inference/obj_inference", Object, queue_size=3
+            "/inference/obj_inference", Objects, queue_size=3
         )
 
     def get_distance(
@@ -99,13 +98,22 @@ class Distance_Inference:
         return (object_sizes, rel_positions)
 
     def callback(self, pred: Prediction) -> None:
+        print("Inference heard message!")
         sizes, positions = self.get_distance(
             depth_map=pred.depth_map,
             mask=pred.mask,
             centers=pred.centers,
         )
-        obj = Object()
+        obj = Objects()
         obj.positions = positions
         obj.labels = pred.labels
         obj.sizes = sizes
         self.inference_pub.publish(obj)
+
+
+if __name__ == "__main__":
+    dist_inf = Distance_Inference()
+    rospy.init_node("object_inference")
+
+    while not rospy.is_shutdown():
+        rospy.spin()

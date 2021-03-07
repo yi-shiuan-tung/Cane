@@ -1,4 +1,3 @@
-
 <launch>
     <rosparam command="load" file="$(find video_stream)/config/config.yaml"/>
     <node pkg="video_stream" type="streamer.py" name="video_stream" output="screen"/>

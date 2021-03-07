@@ -17,6 +17,8 @@ find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(message_generation REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -105,7 +107,7 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-    CATKIN_DEPENDS message_runtime
+    CATKIN_DEPENDS message_runtime std_msgs sensor_msgs
 #  INCLUDE_DIRS include
 #  LIBRARIES test
 #  CATKIN_DEPENDS other_catkin_pkg

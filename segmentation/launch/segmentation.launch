@@ -1,0 +1,5 @@
+<launch>
+    <rosparam command="load" file="$(find segmentation)/config/config.yaml"/>
+    <node pkg="segmentation" type="seg.py" name="segmentation" output="screen"/>
+</launch>
+
