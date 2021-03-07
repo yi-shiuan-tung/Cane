@@ -9,7 +9,8 @@ Input: [segmentation/prediction](../segmentation/msg/Prediction.msg)
 ## Object ROS Message
 
 ```bash
-geometry_msgs/Point[] obj_positions    # relative position vectors, norm is distance
+uint32 id
+geometry_msgs/Point[] positions        # relative position vectors, norm is distance
 string[] labels                        # labels of objects
 float32[] sizes                        # width of objects
 ```
