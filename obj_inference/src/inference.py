@@ -4,8 +4,8 @@ from typing import Tuple, Union
 import numpy as np
 import rospy
 import torch
+from cv_bridge import CvBridge
 from obj_inference.msg import Objects
-from pandas import unique
 from scipy import ndimage, stats
 from segmentation.msg import Prediction
 from sensor_msgs.msg import Image
@@ -23,6 +23,7 @@ class Distance_Inference:
         self.inference_pub = rospy.Publisher(
             "/inference/obj_inference", Objects, queue_size=3
         )
+        self.bridge = CvBridge()
 
     def get_distance(
         self,
@@ -48,10 +49,7 @@ class Distance_Inference:
             - **relative_positions** of shape `(objects_found, 3)`, which are direction vectors
                 that tell where the object is in relation to the camera.
         """
-
-        # Get all unique object vals in mask
-        unique_vals = unique(mask.ravel())
-        num_objects = len(unique_vals)
+        num_objects = mask.shape[0]
 
         object_sizes = np.zeros((num_objects))
         rel_positions = np.zeros((num_objects, 2))
@@ -62,13 +60,12 @@ class Distance_Inference:
         if centers.sum() == 0:
             fill_center = True
             centers = np.zeros((num_objects, 2))
+        else:
+            # Otherwise we have to unflatten array
+            centers = centers.reshape(num_objects, 2)
 
         ### rel_positions[i][1] is distances to objects
-        for i in range(num_objects):
-            # Single object mask
-            #  obj_mask = np.ma.masked_where(mask == unique_vals[i], mask)
-            obj_mask = np.ma.masked_equal(unique_vals[i], mask).mask
-
+        for i, obj_mask in enumerate(mask):
             # Trimmed mean for distance to reject outliers
             obj = obj_mask * depth_map
             rel_positions[i][1] = stats.trim_mean(
@@ -98,14 +95,28 @@ class Distance_Inference:
         return (object_sizes, rel_positions)
 
     def callback(self, pred: Prediction) -> None:
-        print("Inference heard message!")
-        sizes, positions = self.get_distance(
-            depth_map=pred.depth_map,
-            mask=pred.mask,
-            centers=pred.centers,
+        print("Inference heard message!", pred.id)
+        dep = self.bridge.imgmsg_to_cv2(pred.depth_map, desired_encoding="passthrough")
+        #  mask = self.bridge.imgmsg_to_cv2(pred.mask, desired_encoding="passthrough")
+
+        # Has shape (n_objects, H, W)
+        mask = np.frombuffer(pred.mask, dtype=np.uint8).reshape(
+            pred.mask_channels,
+            pred.mask_width,
+            pred.mask_height,
         )
+
+        sizes, positions = self.get_distance(
+            depth_map=dep,
+            mask=mask,
+            centers=np.array(pred.centers),
+        )
+        print("\t\tObject inf: ")
+        print("Positions: ", positions)
+        print("sizes: ", sizes)
         obj = Objects()
         obj.positions = positions
+        obj.id = pred.id
         obj.labels = pred.labels
         obj.sizes = sizes
         self.inference_pub.publish(obj)

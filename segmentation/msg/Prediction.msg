@@ -1,6 +1,10 @@
+uint32 id
 string[] labels
-float32[] centers
 float32[] scores
-sensor_msgs/Image mask
+float32[] centers
 sensor_msgs/Image depth_map
 
+uint8[] mask
+uint16 mask_height
+uint16 mask_width
+uint16 mask_channels

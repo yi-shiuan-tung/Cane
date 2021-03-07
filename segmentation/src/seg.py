@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Tuple, Union
 
@@ -127,9 +128,8 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         self, x: Tensor
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple[str, ...]]:
         pred = self.forward(x)["instances"]
-
         centers = pred.pred_boxes.get_centers().cpu().numpy()
-        mask = self.format_mask(pred.pred_masks.cpu().numpy().astype(np.uint8))
+        mask = pred.pred_masks.cpu().numpy().astype(np.uint8)
         labels = self.get_class_names(pred.pred_classes)
         scores = pred.scores.cpu().numpy()
 
@@ -166,7 +166,8 @@ class SegmentationModel(nn.Module):
         Args:
             input_imgs (video_stream.msg.Stream): Custom ROS message type, given by video_stream node
         """
-        print("SegmentationModel recieved message")
+        print("SegmentationModel recieved message", input_imgs.id)
+        start_t = time.perf_counter()
         rgb_img = self.cv_bridge.imgmsg_to_cv2(
             input_imgs.rgb,
             desired_encoding="passthrough",
@@ -174,12 +175,18 @@ class SegmentationModel(nn.Module):
         (mask, centers, labels, scores) = self.model.full_output(rgb_img)
 
         pub_img = Prediction()
-        pub_img.mask.data = mask
-        pub_img.depth_map.data = input_imgs.depth_map
+        pub_img.depth_map = input_imgs.depth_map
+        pub_img.mask = mask.ravel().tobytes()
+        pub_img.mask_height = mask.shape[2]
+        pub_img.mask_width = mask.shape[1]
+        pub_img.mask_channels = mask.shape[0]
+        pub_img.id = input_imgs.id
         pub_img.scores = scores
-        pub_img.centers = centers
+        pub_img.centers = centers.ravel()
         pub_img.labels = labels
 
+        end_t = time.perf_counter()
+        print("TIME TAKEN SEG NODE: ", end_t - start_t)
         self.pred_pub.publish(pub_img)
 
 
