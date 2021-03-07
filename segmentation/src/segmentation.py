@@ -7,11 +7,12 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 from cv_bridge import CvBridge
+from torch import Tensor
+from video_stream.msg import Stream
+
 from segmentation.detectron2.detectron2.config import get_cfg
 from segmentation.detectron2.detectron2.engine import DefaultPredictor
 from segmentation.msg import Prediction
-from torch import Tensor
-from video_stream.msg import Stream
 
 if TYPE_CHECKING:
     from segmentation.detectron2.detectron2.config.config import CfgNode

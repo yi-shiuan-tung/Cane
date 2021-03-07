@@ -51,9 +51,7 @@ find_package(std_msgs REQUIRED)
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  Objects.msg
-#   Message1.msg
-#   Message2.msg
+  Prediction.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -108,6 +106,7 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
     CATKIN_DEPENDS message_runtime
+
 #  INCLUDE_DIRS include
 #  LIBRARIES test
 #  CATKIN_DEPENDS other_catkin_pkg

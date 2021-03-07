@@ -49,11 +49,10 @@ find_package(std_msgs REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  Stream.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -70,10 +69,11 @@ find_package(std_msgs REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs  # Or other packages containing msgs
+  sensor_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -105,6 +105,7 @@ find_package(std_msgs REQUIRED)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
+    CATKIN_DEPENDS message_runtime
 #  INCLUDE_DIRS include
 #  LIBRARIES test
 #  CATKIN_DEPENDS other_catkin_pkg
