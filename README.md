@@ -28,8 +28,7 @@
 ## Important ROS Topics
 
 - [`/seg/prediction`](./segmentation/msg/Prediction.msg) -- Segmentation masks, object centers, labels
-- [`/video_stream/rgb_img`](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/Image.html) -- RGB input image
-- [`/video_stream/depth_img`](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/Image.html) -- Depth image input
+- [`/video_stream/input_imgs`](./video_stream/msg/Stream.msg) -- Depth map + RGB input image
 - [`/inference/obj_inference`](./obj_inference/msg/Objects.msg) -- Distances, relative positions of objects, labels
 
 
