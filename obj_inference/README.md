@@ -13,6 +13,7 @@ uint32 id
 geometry_msgs/Point[] positions        # relative position vectors, norm is distance
 string[] labels                        # labels of objects
 float32[] sizes                        # width of objects
+float32[] scores                       # confidence scores of labels
 ```
 
 

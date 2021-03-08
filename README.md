@@ -17,7 +17,6 @@
 ## Project Layout
 ```
 .
-├── lib                          # External libraries
 ├── video_stream                 # Streams video from bagfile or Realsense Cam.
 ├── segmentation                 # Takes streamed video and outputs prediction masks + classes
 ├── obj_inference                # Extracts distance and center point from pred. masks
@@ -30,15 +29,6 @@
 - [`/seg/prediction`](./segmentation/msg/Prediction.msg) -- Segmentation masks, object centers, labels
 - [`/video_stream/input_imgs`](./video_stream/msg/Stream.msg) -- Depth map + RGB input image
 - [`/inference/obj_inference`](./obj_inference/msg/Objects.msg) -- Distances, relative positions of objects, labels
-
-
-## Output
-
- - label
- - distance
- - Relative location from cane
- - class probability
- - obj. width
 
 
 

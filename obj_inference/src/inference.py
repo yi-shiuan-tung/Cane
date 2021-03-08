@@ -116,9 +116,10 @@ class Distance_Inference:
         print("sizes: ", sizes)
         obj = Objects()
         obj.positions = positions
+        obj.sizes = sizes
         obj.id = pred.id
         obj.labels = pred.labels
-        obj.sizes = sizes
+        obj.scores = pred.scores
         self.inference_pub.publish(obj)
 
 
