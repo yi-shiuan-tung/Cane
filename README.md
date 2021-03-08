@@ -48,10 +48,19 @@
 
 - pygame
 - ROS Melodic, built with Python3
+- OpenCV >= 4.4.0
 
 
 ## Building
 
+### Install Detectron2
+ 
+```bash
+$ git clone https://github.com/facebookresearch/detectron2.git && cd detectron2
+$ python setup.py install
+```
+
+### Building project
 ```bash
 ### SOURCE ROS FIRST ###
 
@@ -81,7 +90,6 @@ $ roslaunch obj_inference inference.launch
 $ roslaunch video_stream streamer.launch
 ```
 
-
 ## Config File
 
 Entries to edit:
@@ -108,6 +116,11 @@ visualize: True                                   # Visualize input images via c
 
 ### Segmentation model config
 segmentation_model: "detectron"                  
+
+model_weights: "./segmentation/detectron2/weights/model_final_a54504.pkl"
+model_config: "./segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
+=======
+
 ```
 
 

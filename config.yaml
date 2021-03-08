@@ -1,0 +1,32 @@
+---
+######################
+# Video Stream Config
+######################
+visualize: True
+### RosBag Input
+video_stream: "ROSBag"
+bag_file: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/bags/rgbd.bag"
+topics: 
+    - "/camera/color/image_raw"
+    - "/camera/depth/image_rect_raw"
+
+publish_rate: 2
+
+### Intel Realsense input
+# video_stream: "RealSense"
+
+
+### directory of images input
+# video_stream: "RawImages"
+rgb_dir: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/rgbd_output/RGB"
+depth_dir: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/rgbd_output/depth"
+
+
+############################
+# Segmentation Model Config
+############################
+segmentation_model: "detectron"
+
+model_weights: "/home/epiphyte/Documents/Research/cane/segmentation/detectron2/weights/model_final_a54504.pkl"
+
+model_config: "/home/epiphyte/Documents/Research/cane/segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"

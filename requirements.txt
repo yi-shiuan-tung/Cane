@@ -1,0 +1,4 @@
+pyrealsense2==2.42.0.2924
+torch==1.7.1
+scipy==1.5.3
+numpy==1.18.5
