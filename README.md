@@ -118,8 +118,6 @@ segmentation_model: "detectron"
 
 model_weights: "./segmentation/detectron2/weights/model_final_a54504.pkl"
 model_config: "./segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
-=======
-
 ```
 
 
