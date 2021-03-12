@@ -8,7 +8,6 @@ from obj_inference.msg import Objects
 from segmentation.msg import Prediction
 from video_stream.msg import Stream
 
-cv2.namedWindow("input")
 bridge = CvBridge()
 
 
@@ -87,6 +86,10 @@ class Visualizer:
 
 
 if __name__ == "__main__":
-    rospy.init_node("visualize")
-    viz = Visualizer()
-    rospy.spin()
+    viz = rospy.get_param("visualize")
+
+    if viz:
+        rospy.init_node("visualize")
+        cv2.namedWindow("input")
+        viz = Visualizer()
+        rospy.spin()
