@@ -143,7 +143,7 @@ class RawImages(VideoStream):
             msg = Stream()
             msg.rgb = rgb.message
             msg.depth_map = dep.message
-            msg.id = self.index
+            msg.header = rgb.message.header
             self.input_pub.publish(msg)
             time.sleep(self.publish_rate - start_t)
 
@@ -221,7 +221,7 @@ class RealSense(VideoStream):
             msg = Stream()
             msg.rgb = rgb.message
             msg.depth_map = dep.message
-            msg.id = self.index
+            msg.header = rgb.message.header
             self.input_pub.publish(msg)
             time.sleep(self.publish_rate - start_t)
 
@@ -334,11 +334,11 @@ class ROSBag(VideoStream):
         while not rospy.is_shutdown():
             start_t = time.time()
             rgb, dep = self.wait_for_frame()
-            print("video_stream publishing image", self.index)
             msg = Stream()
             msg.rgb = rgb.message
             msg.depth_map = dep.message
-            msg.id = self.index
+            msg.header = rgb.message.header
+            print("video_stream publishing image", msg.header.stamp)
             self.input_pub.publish(msg)
             time.sleep(self.publish_rate - (time.time() - start_t))
 

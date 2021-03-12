@@ -1,0 +1,8 @@
+<launch>
+    <rosparam command="load" file="$(find obj_inference)/config/config.yaml"/>
+    <node pkg="obj_inference" type="inference.py" name="obj_inference" output="screen"/>
+    <node pkg="segmentation" type="seg.py" name="segmentation" output="screen"/>
+    <node pkg="video_stream" type="streamer.py" name="video_stream" output="screen"/>
+    <node pkg="visualize" type="viz.py" name="viz" output="screen"/>
+</launch>
+

@@ -1,4 +1,4 @@
-uint32 id
+std_msgs/Header header
 string[] labels
 float32[] scores
 float32[] centers

@@ -95,7 +95,7 @@ class Distance_Inference:
         return (object_sizes, rel_positions)
 
     def callback(self, pred: Prediction) -> None:
-        print("Inference heard message!", pred.id)
+        print("Inference heard message!", pred.header.stamp)
         dep = self.bridge.imgmsg_to_cv2(pred.depth_map, desired_encoding="passthrough")
         #  mask = self.bridge.imgmsg_to_cv2(pred.mask, desired_encoding="passthrough")
 
@@ -111,13 +111,14 @@ class Distance_Inference:
             mask=mask,
             centers=np.array(pred.centers),
         )
-        print("\t\tObject inf: ")
-        print("Positions: ", positions)
-        print("sizes: ", sizes)
+        #  print("\t\tObject inf: ")
+        #  print("Positions: ", positions.shape)
+        #  print("sizes: ", sizes.shape)
+        #  print("scores: ", pred.scores)
         obj = Objects()
-        obj.positions = positions
+        obj.positions = positions.ravel()
         obj.sizes = sizes
-        obj.id = pred.id
+        obj.header = pred.header
         obj.labels = pred.labels
         obj.scores = pred.scores
         self.inference_pub.publish(obj)

@@ -166,8 +166,8 @@ class SegmentationModel(nn.Module):
         Args:
             input_imgs (video_stream.msg.Stream): Custom ROS message type, given by video_stream node
         """
-        print("SegmentationModel recieved message", input_imgs.id)
-        start_t = time.perf_counter()
+        print("SegmentationModel recieved message", input_imgs.header.stamp)
+        #  start_t = time.perf_counter()
         rgb_img = self.cv_bridge.imgmsg_to_cv2(
             input_imgs.rgb,
             desired_encoding="passthrough",
@@ -180,13 +180,13 @@ class SegmentationModel(nn.Module):
         pub_img.mask_height = mask.shape[2]
         pub_img.mask_width = mask.shape[1]
         pub_img.mask_channels = mask.shape[0]
-        pub_img.id = input_imgs.id
+        pub_img.header = input_imgs.header
         pub_img.scores = scores
         pub_img.centers = centers.ravel()
         pub_img.labels = labels
 
-        end_t = time.perf_counter()
-        print("TIME TAKEN SEG NODE: ", end_t - start_t)
+        #  end_t = time.perf_counter()
+        #  print("TIME TAKEN SEG NODE: ", end_t - start_t)
         self.pred_pub.publish(pub_img)
 
 
