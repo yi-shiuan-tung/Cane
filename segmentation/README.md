@@ -9,7 +9,7 @@
 ```bash
 - Prediction.msg
 
-uint32 id
+std_msgs/Header header
 string[] labels                 # labels of each detected object
 float32[] scores                # Confidence scores of each obj
 float32[] centers               # centers of objects (if using detectron model)

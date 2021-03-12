@@ -35,7 +35,6 @@
 
 ## Dependencies
 
-- pygame
 - ROS Melodic, built with Python3
 - OpenCV >= 4.4.0
 
