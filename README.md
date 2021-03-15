@@ -47,6 +47,13 @@
 $ git clone https://github.com/facebookresearch/detectron2.git && cd detectron2
 $ python setup.py install
 ```
+Then [Download Detectron weights](https://dl.fbaipublicfiles.com/detectron2/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x/137260431/model_final_a54504.pkl), 
+for the R50-FPN Mask R-CNN for COCO InstanceSegmentation, all model weights can be found on the [Detectron GitHub](https://github.com/facebookresearch/detectron2/blob/master/MODEL_ZOO.md)
+
+Then download the [model metric file](https://dl.fbaipublicfiles.com/detectron2/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x/137260431/metrics.json).
+
+
+
 
 ### Building project
 ```bash
@@ -89,24 +96,36 @@ Entries to edit:
 - Semantic Segmentation Model -- [segmentation](./segmentation/README.md)
     - `detectron` - Facebook's [Detectron2 model](https://github.com/facebookresearch/detectron2)
 
+
 #### Example:
 ```yaml
-### Video Input Config
-video_stream: "ROSBag"                            
+##################################
+####### Video Input Config #######
+##################################
+# How the input images are fed to the model
+video_stream: "ROSBag"                            # Valid inputs: ["RawImages", "RealSense"]
+publish_rate: 2                                   # Publish an image every <publish_rate> seconds
+visualize: True                                   # Visualize input images via cv2.namedWindow
 
-bag_file: "./segmentation/bags/rgbd.bag"          # Input ROSbag file
-
-topics:                                           # Check available topics via rosbag info <bag_file>
+### ROSBag Config ###
+bag_file: "./segmentation/bags/rgbd.bag"          # Input ROSbag file, only necessary for "ROSBag" video_stream
+topics:                                           # Topics to subscribe to check available topics via rosbag info <bag_file>
     - "/camera/depth/image_rect_raw/compressed"
     - "/camera/color/image_raw/compressed"
 
-visualize: True                                   # Visualize input images via cv2.namedWindow
+### RawFiles Config ###
+rgb_dir: ".../path/to/rgb_dir"
+depth_dir: ".../path/to/depth_dir"
 
-### Segmentation model config
+
+#####################################
+##### Segmentation model config #####
+#####################################
 segmentation_model: "detectron"                  
 
-model_weights: "./segmentation/detectron2/weights/model_final_a54504.pkl"
-model_config: "./segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
+# Weights and config for Detectron2
+model_weights: "...path/to/weights/model_final_a54504.pkl"
+model_config: "...path/to/weights/mask_rcnn_R_50_FPN_1x.yaml"
 ```
 
 
