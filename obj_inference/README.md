@@ -18,6 +18,23 @@ float32[] sizes                        # width of objects
 float32[] scores                       # confidence scores of labels
 ```
 
+---
+**NOTE**
+
+The `Objects.positions` field MUST be resized when recieving. ROS messages only accept
+1 dimensional arrays. 
+
+Ex:
+
+```python
+def subscriber_callback(object_inference):
+    sizes = np.array(object_inference.sizes)
+    positions = np.array(object_inference.positions).reshape(sizes.shape[0], 2)
+    ...
+```
+
+---
+
 
 ## Finding size of object given the distance
 

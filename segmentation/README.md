@@ -25,5 +25,25 @@ uint16 mask_channels
 ```
 
 
+---
+**NOTE**
+
+The `Prediction.mask` field MUST be resized when recieving. ROS messages only accept
+1 dimensional arrays. 
+
+Ex:
+
+```python
+def subscriber_callback(seg_output):
+    height = pred.mask_height
+    width = pred.mask_width
+    channels = pred.mask_channels
+
+    # using dtype=np.uint8 to maintain same type
+    mask = np.frombuffer(pred.mask, dtype=np.uint8).reshape(channels, width, height)
+```
+
+---
+
 
 

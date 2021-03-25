@@ -3,6 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Tuple, Union
 
+import message_filters
 import numpy as np
 import rospy
 #  import segmentation_models_pytorch as smp
@@ -12,8 +13,8 @@ from cv_bridge import CvBridge
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultPredictor
 from segmentation.msg import Prediction
+from sensor_msgs.msg import Image
 from torch import Tensor
-from video_stream.msg import Stream
 
 if TYPE_CHECKING:
     from segmentation.detectron2.detectron2.config.config import CfgNode
@@ -44,10 +45,16 @@ class AbstractModel(ABC):
         ...
 
 
+class EfficientNet:
+    r""" """
+
+    def __init__(self):
+        pass
+
+
 class DetectronModel(DefaultPredictor, AbstractModel):
     """Detectron Model interface"""
 
-    # TODO: UPdate to input yaml file and weight files
     def __init__(
         self,
         model_weights: str,
@@ -156,31 +163,28 @@ class SegmentationModel(nn.Module):
             self.model = DetectronModel(model_weights=weights, config_file=config_file)
 
         self.pred_pub = rospy.Publisher("/seg/prediction", Prediction, queue_size=3)
-        self.input_sub = rospy.Subscriber(
-            "/video_stream/input_imgs", Stream, self.callback
-        )
+        rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
+        dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
+        synch = message_filters.ApproximateTimeSynchronizer([rgb_sub, dep_sub], 3, 0.1)
+        synch.registerCallback(self.callback)
         self.cv_bridge = CvBridge()
 
-    def callback(self, input_imgs: Stream) -> None:
-        r"""ROS Subscriber to input RGB image + depth maps
-        Args:
-            input_imgs (video_stream.msg.Stream): Custom ROS message type, given by video_stream node
-        """
-        print("SegmentationModel recieved message", input_imgs.header.stamp)
-        #  start_t = time.perf_counter()
+    def callback(self, rgb: Image, depth_map: Image) -> None:
+        r"""ROS Subscriber to input RGB image + depth maps"""
+        print("SegmentationModel recieved message", rgb.header.stamp)
         rgb_img = self.cv_bridge.imgmsg_to_cv2(
-            input_imgs.rgb,
+            rgb,
             desired_encoding="passthrough",
         )
         (mask, centers, labels, scores) = self.model.full_output(rgb_img)
 
         pub_img = Prediction()
-        pub_img.depth_map = input_imgs.depth_map
+        pub_img.depth_map = depth_map
         pub_img.mask = mask.ravel().tobytes()
         pub_img.mask_height = mask.shape[2]
         pub_img.mask_width = mask.shape[1]
         pub_img.mask_channels = mask.shape[0]
-        pub_img.header = input_imgs.header
+        pub_img.header = rgb.header
         pub_img.scores = scores
         pub_img.centers = centers.ravel()
         pub_img.labels = labels

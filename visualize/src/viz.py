@@ -6,7 +6,7 @@ import rospy
 from cv_bridge import CvBridge
 from obj_inference.msg import Objects
 from segmentation.msg import Prediction
-from video_stream.msg import Stream
+from sensor_msgs.msg import Image
 
 bridge = CvBridge()
 
@@ -35,15 +35,15 @@ def annotate_image(rgb, centers, labels, scores, dists):
     return rgb
 
 
-def callback(pred, inputs, inf):
-
+def callback(pred, inf, rgb, dep):
+    print("Visualize recieved messages")
     sizes = np.array(inf.sizes)
     scores = np.array(inf.scores)
     labels = inf.labels
     positions = np.array(inf.positions).reshape(sizes.shape[0], 2)
 
-    rgb_img = bridge.imgmsg_to_cv2(inputs.rgb, desired_encoding="passthrough")
-    dep_img = bridge.imgmsg_to_cv2(inputs.depth_map, desired_encoding="passthrough")
+    rgb_img = bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
+    dep_img = bridge.imgmsg_to_cv2(dep, desired_encoding="passthrough")
 
     height = pred.mask_height
     width = pred.mask_width
@@ -73,12 +73,13 @@ class Visualizer:
     r""" """
 
     def __init__(self):
-        self.pred_sub = message_filters.Subscriber("/seg/prediction", Prediction)
-        self.input_sub = message_filters.Subscriber("/video_stream/input_imgs", Stream)
-        self.inf_sub = message_filters.Subscriber("/inference/obj_inference", Objects)
+        pred_sub = message_filters.Subscriber("/seg/prediction", Prediction)
+        inf_sub = message_filters.Subscriber("/inference/obj_inference", Objects)
+        rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
+        dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
 
         ts = message_filters.ApproximateTimeSynchronizer(
-            [self.pred_sub, self.input_sub, self.inf_sub],
+            [pred_sub, inf_sub, rgb_sub, dep_sub],
             10,
             0.1,
         )

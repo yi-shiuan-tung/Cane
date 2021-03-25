@@ -2,6 +2,8 @@
 import glob
 import itertools
 import os
+import signal
+import subprocess
 import time
 import warnings
 from abc import ABC, abstractmethod
@@ -19,23 +21,23 @@ from video_stream.msg import Stream
 class VideoStream(ABC):
     @abstractmethod
     def __init__(self):
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def get_frame(self):
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def wait_for_frame(self) -> Union[None, Tuple[Any, ...]]:
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def start(self):
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def stop(self):
-        ...
+        raise NotImplementedError
 
 
 class RawImages(VideoStream):
@@ -45,7 +47,6 @@ class RawImages(VideoStream):
         self,
         rgb_dir: str,
         depth_dir: str,
-        visualize: bool = False,
         publish_rate: Union[float, int] = 2,
     ):
 
@@ -68,30 +69,6 @@ class RawImages(VideoStream):
         # Image publishers
         self.input_pub = rospy.Publisher(
             "/video_stream/input_imgs", Stream, queue_size=2
-        )
-
-        if visualize:
-            self.input_viz_win = cv2.namedWindow("Input Stream")
-
-    def __del__(self):
-        cv2.destroyWindow("Input Stream")
-
-    def viz(self, rgb, depth):
-        cv2.imshow(
-            "Input Stream",
-            np.concatenate(
-                (
-                    rgb,
-                    np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8),
-                    cv2.applyColorMap(
-                        cv2.normalize(
-                            depth, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-                        ),
-                        cv2.COLORMAP_JET,
-                    ),
-                ),
-                1,
-            ),
         )
 
     def __len__(self) -> int:
@@ -154,7 +131,6 @@ class RealSense(VideoStream):
     def __init__(
         self,
         input_file: Optional[str] = None,
-        visualize: bool = False,
         publish_rate: Union[int, float] = 2,
     ) -> None:
         # RealSense Pipeline
@@ -173,30 +149,6 @@ class RealSense(VideoStream):
 
         self.input_pub = rospy.Publisher(
             "/video_stream/input_imgs", Stream, queue_size=2
-        )
-        # Create cv2 window if we are visualizing input stream
-        if visualize:
-            self.input_viz_win = cv2.namedWindow("Input Stream")
-
-    def __del__(self):
-        cv2.destroyWindow("Input Stream")
-
-    def viz(self, rgb, depth):
-        cv2.imshow(
-            "Input Stream",
-            np.concatenate(
-                (
-                    rgb,
-                    np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8),
-                    cv2.applyColorMap(
-                        cv2.normalize(
-                            depth, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-                        ),
-                        cv2.COLORMAP_JET,
-                    ),
-                ),
-                1,
-            ),
         )
 
     def start(self) -> None:
@@ -239,7 +191,6 @@ class ROSBag(VideoStream):
         self,
         input_file: str,
         topics: list,
-        visualize: bool = False,
         publish_rate: Union[int, float] = 2,
     ) -> None:
 
@@ -251,51 +202,31 @@ class ROSBag(VideoStream):
         self.generators = []
         self.length = -1
 
-        for topic in topics:
+        if len(topics) > 0:
+            for topic in topics:
+                # Raise exception if topic is not in bag file
+                if topic not in self.bag.get_type_and_topic_info()[1].keys():
+                    raise ValueError(f"Input topic {topic} is not found in bagfile")
 
-            # Raise exception if topic is not in bag file
-            if topic not in self.bag.get_type_and_topic_info()[1].keys():
-                raise ValueError(f"Input topic {topic} is not found in bagfile")
+                # Raise warning if topic lengths do not match
+                if (self.length != -1) and (
+                    self.length != self.bag.get_message_count(topic)
+                ):
+                    warnings.warn("Some topics have different lengths...", Warning)
 
-            # Raise warning if topic lengths do not match
-            if (self.length != -1) and (
-                self.length != self.bag.get_message_count(topic)
-            ):
-                warnings.warn("Some topics have different lengths...", Warning)
+                else:
+                    self.length = self.bag.get_message_count(topic)
 
-            else:
-                self.length = self.bag.get_message_count(topic)
-
-            self.generators.append(self.bag.read_messages(topics=topic))
+                self.generators.append(self.bag.read_messages(topics=topic))
+        else:
+            pass
 
         self.input_pub = rospy.Publisher(
             "/video_stream/input_imgs", Stream, queue_size=2
         )
-        # Create cv2 window if we are visualizing input stream
-        if visualize:
-            self.input_viz_win = cv2.namedWindow("Input Stream")
 
     def __del__(self):
-        cv2.destroyWindow("Input Stream")
         self.bag.close()
-
-    def viz(self, rgb, depth):
-        cv2.imshow(
-            "Input Stream",
-            np.concatenate(
-                (
-                    rgb,
-                    np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8),
-                    cv2.applyColorMap(
-                        cv2.normalize(
-                            depth, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-                        ),
-                        cv2.COLORMAP_JET,
-                    ),
-                ),
-                1,
-            ),
-        )
 
     def __len__(self) -> int:
         return self.length
@@ -315,6 +246,7 @@ class ROSBag(VideoStream):
                 return_list.append(next(itertools.islice(gen, index, None)))
             except StopIteration:
                 return None
+
         return tuple(return_list)
 
     def start(self):
@@ -343,34 +275,66 @@ class ROSBag(VideoStream):
             time.sleep(self.publish_rate - (time.time() - start_t))
 
 
+class ROSBagSP(VideoStream):
+    """Start subprocess to play ROSbag file as user specified publish_rate."""
+
+    def __init__(
+        self,
+        input_file: str,
+        publish_rate_hz: Union[int, float] = 2,
+    ) -> None:
+
+        CMD = ["rosbag", "play", f"--hz={publish_rate_hz}", input_file]
+        for a in CMD:
+            print(a)
+
+        path = os.path.abspath(input_file)
+        hz = "--hz={}".format(publish_rate_hz)
+        DVNULL = open(os.devnull, "w")
+        print("Starting to publish from ROSBag")
+        self.proc = subprocess.Popen(["rosbag", "play", hz, input_file], stdout=DVNULL)
+
+    def __del__(self):
+        self.proc.kill()
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def get_frame(self) -> Tuple[Any, ...]:
+        pass
+
+    def wait_for_frame(self) -> Tuple[Any, ...]:
+        pass
+
+    def loop(self):
+        rospy.spin()
+
+
 def main():
     rospy.init_node("video_stream")
     stream_type = rospy.get_param("video_stream")
-    visualize = rospy.get_param("visualize")
     video_stream = None
 
     if stream_type.lower() == "rosbag":
         bag_file = rospy.get_param("bag_file")
         publish_rate = rospy.get_param("publish_rate")
-        topics = rospy.get_param("topics")
-        video_stream = ROSBag(
+        video_stream = ROSBagSP(
             input_file=bag_file,
-            topics=topics,
-            visualize=visualize,
-            publish_rate=publish_rate,
+            publish_rate_hz=publish_rate,
         )
 
     elif stream_type.lower() == "realsense":
-        video_stream = RealSense(visualize=visualize)
+        video_stream = RealSense()
 
     elif stream_type.lower() == "rawimages":
         publish_rate = rospy.get_param("publish_rate")
         rgb_dir = rospy.get_param("rgb_dir")
         depth_dir = rospy.get_param("depth_dir")
 
-        video_stream = RawImages(
-            rgb_dir=rgb_dir, depth_dir=depth_dir, visualize=visualize
-        )
+        video_stream = RawImages(rgb_dir=rgb_dir, depth_dir=depth_dir)
 
     # Loop, publishing images
     video_stream.loop()
