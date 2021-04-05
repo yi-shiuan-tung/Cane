@@ -284,10 +284,6 @@ class ROSBagSP(VideoStream):
         publish_rate_hz: Union[int, float] = 2,
     ) -> None:
 
-        CMD = ["rosbag", "play", f"--hz={publish_rate_hz}", input_file]
-        for a in CMD:
-            print(a)
-
         path = os.path.abspath(input_file)
         hz = "--hz={}".format(publish_rate_hz)
         DVNULL = open(os.devnull, "w")

@@ -107,11 +107,13 @@ video_stream: "ROSBag"                            # Valid inputs: ["RawImages", 
 publish_rate: 2                                   # Publish an image every <publish_rate> seconds
 visualize: True                                   # Visualize input images via cv2.namedWindow
 
+### Necessary for all input methods ###
+rgb_input_topic: "/camera/depth/image_rect_raw/compressed"   # RGB Input topic to subscribe to 
+depth_input_topic: "/camera/color/image_raw/compressed"      #  Depth input topic to subscribe to
+
 ### ROSBag Config ###
 bag_file: "./segmentation/bags/rgbd.bag"          # Input ROSbag file, only necessary for "ROSBag" video_stream
-topics:                                           # Topics to subscribe to check available topics via rosbag info <bag_file>
-    - "/camera/depth/image_rect_raw/compressed"
-    - "/camera/color/image_raw/compressed"
+
 
 ### RawFiles Config ###
 rgb_dir: ".../path/to/rgb_dir"
