@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
+import message_filters
 import numpy as np
 import rospy
 #  import segmentation_models_pytorch as smp
@@ -12,8 +13,8 @@ from cv_bridge import CvBridge
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultPredictor
 from segmentation.msg import Prediction
+from sensor_msgs.msg import Image
 from torch import Tensor
-from video_stream.msg import Stream
 
 if TYPE_CHECKING:
     from segmentation.detectron2.detectron2.config.config import CfgNode
@@ -44,10 +45,16 @@ class AbstractModel(ABC):
         ...
 
 
+class EfficientNet:
+    r""" """
+
+    def __init__(self):
+        pass
+
+
 class DetectronModel(DefaultPredictor, AbstractModel):
     """Detectron Model interface"""
 
-    # TODO: UPdate to input yaml file and weight files
     def __init__(
         self,
         model_weights: str,
@@ -78,6 +85,7 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         cfg.MODEL.WEIGHTS = model_weights
         # This determines the resizing of the image. At 0, resizing is disabled.
         cfg.INPUT.MIN_SIZE_TEST = 0
+        cfg.INPUT.FORMAT = "BGR"
 
         return cfg
 
@@ -141,7 +149,9 @@ class SegmentationModel(nn.Module):
         self,
         model_name: str,
         weights: str,
-        config_file: str = None,
+        rgb_topic: str,
+        depth_topic: str,
+        config_file: str,
     ) -> None:
         super(SegmentationModel, self).__init__()
 
@@ -156,37 +166,43 @@ class SegmentationModel(nn.Module):
             self.model = DetectronModel(model_weights=weights, config_file=config_file)
 
         self.pred_pub = rospy.Publisher("/seg/prediction", Prediction, queue_size=3)
-        self.input_sub = rospy.Subscriber(
-            "/video_stream/input_imgs", Stream, self.callback
-        )
+        rgb_sub = message_filters.Subscriber(rgb_topic, Image)
+        dep_sub = message_filters.Subscriber(depth_topic, Image)
+        synch = message_filters.ApproximateTimeSynchronizer([rgb_sub, dep_sub], 3, 0.1)
+        synch.registerCallback(self.callback)
         self.cv_bridge = CvBridge()
 
-    def callback(self, input_imgs: Stream) -> None:
-        r"""ROS Subscriber to input RGB image + depth maps
-        Args:
-            input_imgs (video_stream.msg.Stream): Custom ROS message type, given by video_stream node
-        """
-        print("SegmentationModel recieved message", input_imgs.id)
-        start_t = time.perf_counter()
+    def callback(
+        self,
+        rgb: Image,
+        depth_map: Image,
+    ) -> None:
+        r"""ROS Subscriber to input RGB image + depth maps"""
+        print(
+            "SegmentationModel recieved message",
+            rgb.header.stamp,
+            depth_map.header.stamp,
+        )
         rgb_img = self.cv_bridge.imgmsg_to_cv2(
-            input_imgs.rgb,
+            rgb,
             desired_encoding="passthrough",
         )
+
         (mask, centers, labels, scores) = self.model.full_output(rgb_img)
 
         pub_img = Prediction()
-        pub_img.depth_map = input_imgs.depth_map
+        pub_img.depth_map = depth_map
         pub_img.mask = mask.ravel().tobytes()
         pub_img.mask_height = mask.shape[2]
         pub_img.mask_width = mask.shape[1]
         pub_img.mask_channels = mask.shape[0]
-        pub_img.id = input_imgs.id
+        pub_img.header = rgb.header
         pub_img.scores = scores
         pub_img.centers = centers.ravel()
         pub_img.labels = labels
 
-        end_t = time.perf_counter()
-        print("TIME TAKEN SEG NODE: ", end_t - start_t)
+        #  end_t = time.perf_counter()
+        #  print("TIME TAKEN SEG NODE: ", end_t - start_t)
         self.pred_pub.publish(pub_img)
 
 
@@ -195,9 +211,14 @@ if __name__ == "__main__":
     weights = rospy.get_param("model_weights")
     model_type = rospy.get_param("segmentation_model")
     config = rospy.get_param("model_config")
-
+    rgb_input_topic = rospy.get_param("rgb_input_topic")
+    depth_input_topic = rospy.get_param("depth_input_topic")
     seg_model = SegmentationModel(
-        model_name=model_type, weights=weights, config_file=config
+        model_name=model_type,
+        weights=weights,
+        config_file=config,
+        rgb_topic=rgb_input_topic,
+        depth_topic=depth_input_topic,
     )
 
     while not rospy.is_shutdown():

@@ -10,7 +10,7 @@ topics:
     - "/camera/color/image_raw"
     - "/camera/depth/image_rect_raw"
 
-publish_rate: 2
+publish_rate: 1
 
 # Intel Realsense input
 video_stream: "RealSense"

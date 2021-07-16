@@ -9,11 +9,31 @@ Input: [segmentation/prediction](../segmentation/msg/Prediction.msg)
 ## Object ROS Message
 
 ```bash
-uint32 id
+- Objects.msg
+
+std_msgs/Header header
 geometry_msgs/Point[] positions        # relative position vectors, norm is distance
 string[] labels                        # labels of objects
 float32[] sizes                        # width of objects
+float32[] scores                       # confidence scores of labels
 ```
+
+---
+**NOTE**
+
+The `Objects.positions` field MUST be resized when recieving. ROS messages only accept
+1 dimensional arrays. 
+
+Ex:
+
+```python
+def subscriber_callback(object_inference):
+    sizes = np.array(object_inference.sizes)
+    positions = np.array(object_inference.positions).reshape(sizes.shape[0], 2)
+    ...
+```
+
+---
 
 
 ## Finding size of object given the distance

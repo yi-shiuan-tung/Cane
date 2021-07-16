@@ -17,7 +17,6 @@
 ## Project Layout
 ```
 .
-├── lib                          # External libraries
 ├── video_stream                 # Streams video from bagfile or Realsense Cam.
 ├── segmentation                 # Takes streamed video and outputs prediction masks + classes
 ├── obj_inference                # Extracts distance and center point from pred. masks
@@ -28,25 +27,14 @@
 ## Important ROS Topics
 
 - [`/seg/prediction`](./segmentation/msg/Prediction.msg) -- Segmentation masks, object centers, labels
-- [`/video_stream/rgb_img`](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/Image.html) -- RGB input image
-- [`/video_stream/depth_img`](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/Image.html) -- Depth image input
+- [`/video_stream/input_imgs`](./video_stream/msg/Stream.msg) -- Depth map + RGB input image
 - [`/inference/obj_inference`](./obj_inference/msg/Objects.msg) -- Distances, relative positions of objects, labels
-
-
-## Output
-
- - label
- - distance
- - Relative location from cane
- - class probability
- - obj. width
 
 
 
 
 ## Dependencies
 
-- pygame
 - ROS Melodic, built with Python3
 - OpenCV >= 4.4.0
 
@@ -59,6 +47,13 @@
 $ git clone https://github.com/facebookresearch/detectron2.git && cd detectron2
 $ python setup.py install
 ```
+Then [Download Detectron weights](https://dl.fbaipublicfiles.com/detectron2/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x/137260431/model_final_a54504.pkl), 
+for the R50-FPN Mask R-CNN for COCO InstanceSegmentation, all model weights can be found on the [Detectron GitHub](https://github.com/facebookresearch/detectron2/blob/master/MODEL_ZOO.md)
+
+Then download the [model metric file](https://dl.fbaipublicfiles.com/detectron2/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x/137260431/metrics.json).
+
+
+
 
 ### Building project
 ```bash
@@ -101,26 +96,38 @@ Entries to edit:
 - Semantic Segmentation Model -- [segmentation](./segmentation/README.md)
     - `detectron` - Facebook's [Detectron2 model](https://github.com/facebookresearch/detectron2)
 
+
 #### Example:
 ```yaml
-### Video Input Config
-video_stream: "ROSBag"                            
-
-bag_file: "./segmentation/bags/rgbd.bag"          # Input ROSbag file
-
-topics:                                           # Check available topics via rosbag info <bag_file>
-    - "/camera/depth/image_rect_raw/compressed"
-    - "/camera/color/image_raw/compressed"
-
+##################################
+####### Video Input Config #######
+##################################
+# How the input images are fed to the model
+video_stream: "ROSBag"                            # Valid inputs: ["RawImages", "RealSense"]
+publish_rate: 2                                   # Publish an image every <publish_rate> seconds
 visualize: True                                   # Visualize input images via cv2.namedWindow
 
-### Segmentation model config
+### Necessary for all input methods ###
+rgb_input_topic: "/camera/depth/image_rect_raw/compressed"   # RGB Input topic to subscribe to 
+depth_input_topic: "/camera/color/image_raw/compressed"      #  Depth input topic to subscribe to
+
+### ROSBag Config ###
+bag_file: "./segmentation/bags/rgbd.bag"          # Input ROSbag file, only necessary for "ROSBag" video_stream
+
+
+### RawFiles Config ###
+rgb_dir: ".../path/to/rgb_dir"
+depth_dir: ".../path/to/depth_dir"
+
+
+#####################################
+##### Segmentation model config #####
+#####################################
 segmentation_model: "detectron"                  
 
-model_weights: "./segmentation/detectron2/weights/model_final_a54504.pkl"
-model_config: "./segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
-=======
-
+# Weights and config for Detectron2
+model_weights: "...path/to/weights/model_final_a54504.pkl"
+model_config: "...path/to/weights/mask_rcnn_R_50_FPN_1x.yaml"
 ```
 
 
