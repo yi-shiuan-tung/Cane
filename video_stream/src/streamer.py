@@ -1,4 +1,4 @@
-#!/usr/bin/env  python
+#!/usr/bin/env  python3
 import glob
 import itertools
 import os
@@ -161,6 +161,7 @@ class RealSense(VideoStream):
         self.publish_rate = publish_rate
         self.pipeline = rs.pipeline()
         self.config = rs.config()
+        self.bridge = CvBridge()
         self.index = -1
 
         # If we are streaming from bag file
@@ -170,6 +171,7 @@ class RealSense(VideoStream):
 
         # TODO: Change parameters of this
         self.config.enable_stream(rs.stream.depth, rs.format.z16, 30)
+        self.config.enable_stream(rs.stream.color, rs.format.bgr8, 30)
 
         self.input_pub = rospy.Publisher(
             "/video_stream/input_imgs", Stream, queue_size=2
@@ -216,14 +218,23 @@ class RealSense(VideoStream):
     def loop(self) -> None:
         while not rospy.is_shutdown():
             start_t = time.time()
-            rgb, dep = self.wait_for_frame()
+            while True:
+                frame = self.wait_for_frame()
+                color_frame = frame.get_color_frame()
+                depth_frame = frame.get_depth_frame()
+                if color_frame and depth_frame:
+                    break
+            rgb_image = np.asanyarray(color_frame.get_data())
+            depth_image = np.asanyarray(depth_frame.get_data())
+            rgb_msg = self.bridge.cv2_to_imgmsg(rgb_image, encoding="passthrough")
+            depth_msg = self.bridge.cv2_to_imgmsg(depth_image, encoding="passthrough")
             self.index += 1
             msg = Stream()
-            msg.rgb = rgb.message
-            msg.depth_map = dep.message
+            msg.rgb = rgb_msg
+            msg.depth_map = depth_msg
             msg.id = self.index
             self.input_pub.publish(msg)
-            time.sleep(self.publish_rate - start_t)
+            time.sleep(self.publish_rate + time.time() - start_t)
 
 
 class ROSBag(VideoStream):
@@ -362,6 +373,7 @@ def main():
 
     elif stream_type.lower() == "realsense":
         video_stream = RealSense(visualize=visualize)
+        video_stream.start()
 
     elif stream_type.lower() == "rawimages":
         publish_rate = rospy.get_param("publish_rate")

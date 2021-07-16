@@ -6,14 +6,14 @@ visualize: True
 ### RosBag Input
 video_stream: "ROSBag"
 bag_file: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/bags/rgbd.bag"
-topics: 
+topics:
     - "/camera/color/image_raw"
     - "/camera/depth/image_rect_raw"
 
 publish_rate: 2
 
-### Intel Realsense input
-# video_stream: "RealSense"
+# Intel Realsense input
+video_stream: "RealSense"
 
 
 ### directory of images input
@@ -26,7 +26,5 @@ depth_dir: "/home/epiphyte/Documents/Research/cane_ws/src/cane/segmentation/rgbd
 # Segmentation Model Config
 ############################
 segmentation_model: "detectron"
-
-model_weights: "/home/epiphyte/Documents/Research/cane/segmentation/detectron2/weights/model_final_a54504.pkl"
-
-model_config: "/home/epiphyte/Documents/Research/cane/segmentation/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
+model_weights: "/home/yi-shiuan/Desktop/cane_ws/detectron/weights/model_final_a54504.pkl"
+model_config: "/home/yi-shiuan/Desktop/cane_ws/detectron/weights//mask_rcnn_R_50_FPN_1x.yaml"
