@@ -315,8 +315,8 @@ class SegmentationModel(nn.Module):
         position_z = []
         for center in centers:
             vector = self.convert_depth_to_phys_coord_using_realsense(center[0], center[1], 1.45)
-            position_x.append(vector[0]+0.75)
-            position_y.append(-vector[1]-0.1)
+            position_x.append(vector[0]+0.65)
+            position_y.append(-vector[1]-0.14)
             position_z.append(vector[2])
         pub_img.position_x = position_x
         pub_img.position_y = position_y
