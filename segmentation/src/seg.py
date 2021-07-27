@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import time
 from abc import ABC, abstractmethod
 from detectron2.data import MetadataCatalog
 from detectron2.utils.visualizer import Visualizer
@@ -18,11 +17,8 @@ from sensor_msgs.msg import Image, CameraInfo
 from torch import Tensor
 from detectron2 import model_zoo
 from scipy import ndimage, stats
-from image_geometry import PinholeCameraModel
 import tf2_ros
 import pyrealsense2
-from geometry_msgs.msg import Point, PointStamped
-import tf2_geometry_msgs
 
 
 REALSENSE_FOCAL_LENGTH = 1.93  # millimeters
@@ -104,7 +100,7 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         cfg.SOLVER.IMS_PER_BATCH = 2
         cfg.SOLVER.BASE_LR = 0.00025
         cfg.SOLVER.MAX_ITER = 1000
-        cfg.MODEL.ROI_HEADS.NUM_CLASSES = 6
+        cfg.MODEL.ROI_HEADS.NUM_CLASSES = 8
 
         return cfg
 
@@ -250,7 +246,7 @@ class SegmentationModel(nn.Module):
             raise ValueError("Input model not available, select one from list")
 
         MetadataCatalog.get("hrc_train").set(thing_classes=['chair-back', 'chair-back-cover', 'chair-bracket', 'leg',
-                                                            'seat', 'top'])
+                                                            'seat', 'top', 'leg-blue', 'leg-red'])
 
         # Create model
         # TODO: UPDATE timm model
@@ -262,19 +258,11 @@ class SegmentationModel(nn.Module):
         self.predictor = DefaultPredictor(self.model.config)
         self.pred_pub = rospy.Publisher("/seg/prediction", Prediction, queue_size=3)
         self.camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo)
-        self.camera_model = PinholeCameraModel()
-        self.camera_model.fromCameraInfo(self.camera_info)
-
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
-        # self.trans = self.tf_buffer.lookup_transform("base", "camera_color_frame", rospy.Time(0), rospy.Duration(20.0))
-        rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
-        dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
-        synch = message_filters.ApproximateTimeSynchronizer([rgb_sub, dep_sub], 5, 0.5)
-        synch.registerCallback(self.callback)
+        rospy.Subscriber("/camera/color/image_raw", Image, self.callback)
+        # dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
+        # synch = message_filters.ApproximateTimeSynchronizer([rgb_sub, dep_sub], 5, 0.5)
+        # synch.registerCallback(self.callback)
         self.cv_bridge = CvBridge()
-
-        self.distance_infer = DistanceInference()
 
     def convert_depth_to_phys_coord_using_realsense(self, x, y, depth):
         _intrinsics = pyrealsense2.intrinsics()
@@ -289,14 +277,13 @@ class SegmentationModel(nn.Module):
         result = pyrealsense2.rs2_deproject_pixel_to_point(_intrinsics, [x, y], depth)
         return result
 
-    def callback(self, rgb: Image, depth_map: Image) -> None:
+    def callback(self, rgb: Image) -> None:
         r"""ROS Subscriber to input RGB image + depth maps
         Args:
             rgb (sensor_msgs.Image): Image message
-            depth_map (sensor_msgs.Image)
         """
         rgb_img = self.cv_bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
-        depth_img = self.cv_bridge.imgmsg_to_cv2(depth_map, desired_encoding="passthrough")
+        # depth_img = self.cv_bridge.imgmsg_to_cv2(depth_map, desired_encoding="passthrough")
 
         (mask, centers, labels, scores) = self.model.full_output(rgb_img)
         outputs = self.predictor(rgb_img)
@@ -316,7 +303,7 @@ class SegmentationModel(nn.Module):
         for center in centers:
             vector = self.convert_depth_to_phys_coord_using_realsense(center[0], center[1], 1.45)
             position_x.append(vector[0]+0.65)
-            position_y.append(-vector[1]-0.14)
+            position_y.append(-vector[1]-0.12)
             position_z.append(vector[2])
         pub_img.position_x = position_x
         pub_img.position_y = position_y
