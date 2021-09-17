@@ -2,9 +2,7 @@
 from abc import ABC, abstractmethod
 from detectron2.data import MetadataCatalog
 from detectron2.utils.visualizer import Visualizer
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
-
-import message_filters
+from typing import Tuple, Union
 import numpy as np
 import rospy
 import torch
@@ -16,19 +14,9 @@ from segmentation.msg import Prediction
 from sensor_msgs.msg import Image, CameraInfo
 from torch import Tensor
 from detectron2 import model_zoo
-from scipy import ndimage, stats
-import tf2_ros
 import pyrealsense2
+import cv2
 
-
-REALSENSE_FOCAL_LENGTH = 1.93  # millimeters
-REALSENSE_SENSOR_HEIGHT_MM = 2.454  # millimeters
-REALSENSE_SENSOR_WIDTH_MM = 3.896  # millimeters
-REALSENSE_REZ_HEIGHT = 800  # pixels
-REALSENSE_REZ_WIDTH = 1280  # pixels
-
-if TYPE_CHECKING:
-    from segmentation.detectron2.detectron2.config.config import CfgNode
 
 AVAILABLE_MODELS = [
     "timm-efficientnet-b0",
@@ -69,11 +57,9 @@ class DetectronModel(DefaultPredictor, AbstractModel):
     def __init__(
         self,
         model_weights: str,
-        config_file: str,
     ) -> None:
         self.config = self.setup_predictor_config(
             model_weights=model_weights,
-            config_file=config_file,
         )
         super().__init__(self.config)
         self.class_names = MetadataCatalog.get("hrc_train").class_names
@@ -82,25 +68,15 @@ class DetectronModel(DefaultPredictor, AbstractModel):
     def setup_predictor_config(
         self,
         model_weights: str,
-        config_file: str,
-    ) -> "CfgNode":
+    ):
         """
         Setup config and return predictor. See config/defaults.py for more options
         """
         cfg = get_cfg()
 
         cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
-        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
-        # Mask R-CNN ResNet101 FPN weights
         cfg.MODEL.WEIGHTS = model_weights
-        # This determines the resizing of the image. At 0, resizing is disabled.
-        cfg.INPUT.MIN_SIZE_TEST = 0
-        cfg.INPUT.FORMAT = "BGR"
-
-        cfg.SOLVER.IMS_PER_BATCH = 2
-        cfg.SOLVER.BASE_LR = 0.00025
-        cfg.SOLVER.MAX_ITER = 1000
-        cfg.MODEL.ROI_HEADS.NUM_CLASSES = 8
+        cfg.MODEL.ROI_HEADS.NUM_CLASSES = 3
 
         return cfg
 
@@ -159,110 +135,39 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         return mask, centers, labels, scores
 
 
-class DistanceInference:
-    def __init__(self):
-        self.bridge = CvBridge()
-
-    def get_distance(
-            self,
-            depth_map: np.ndarray,
-            mask: np.ndarray,
-            centers: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        r"""Get the distance of each object from a numpy array
-        Args:
-            mask (np.ndarray):  Binary masks of found objects
-            depth_map (np.ndarray):  Depth map input from camera
-            centers (np.ndarray):  Centers of objects, output from Detectron
-
-        Returns:
-            distances (np.ndarray): distances of each object
-            sizes (np.ndarray): sizes of each object
-            relative_positions (np.ndarray): positions of each object
-
-        Inputs:
-            - **mask** of shape `(H, W, 1)`, where each object in mask has different integer value.
-
-        Outputs:
-            - **relative_positions** of shape `(objects_found, 3)`, which are direction vectors
-                that tell where the object is in relation to the camera.
-        """
-        num_objects = mask.shape[0]
-
-        object_sizes = np.zeros((num_objects))
-        rel_positions = np.zeros((num_objects, 3))
-
-        fill_center = False
-        # only detectron model inputs the center of each object,
-        # thus if we get an empty array we must fill it
-        if centers.sum() == 0:
-            fill_center = True
-            centers = np.zeros((num_objects, 2))
-        else:
-            # Otherwise we have to unflatten array
-            centers = centers.reshape(num_objects, 2)
-
-        # rel_positions[i][1] is distances to objects
-        for i, obj_mask in enumerate(mask):
-            # Trimmed mean for distance to reject outliers
-            obj = obj_mask * depth_map
-            rel_positions[i][1] = stats.trim_mean(
-                obj[obj > 0], proportiontocut=0.2, axis=None
-            )
-
-            # Sum only width
-            object_px_size = np.max(obj_mask.sum(1))
-            obj_width_sensor = (REALSENSE_SENSOR_WIDTH_MM * object_px_size) / (
-                REALSENSE_REZ_WIDTH
-            )
-            object_sizes[i] = (
-                                      rel_positions[i][1] * obj_width_sensor
-                              ) / REALSENSE_FOCAL_LENGTH
-
-            # Calc width of FOV at known distance
-            field_width = (
-                                  REALSENSE_SENSOR_WIDTH_MM * rel_positions[i][1]
-                          ) / REALSENSE_FOCAL_LENGTH
-
-            if fill_center:
-                centers[i] = ndimage.measurements.center_of_mass(obj_mask)
-
-            rel_positions[i][0] = (centers[i][0] / REALSENSE_REZ_WIDTH) * field_width
-            rel_positions[i][2] = (centers[i][1] / REALSENSE_REZ_HEIGHT) * field_width
-
-        return object_sizes, rel_positions
-
-
 class SegmentationModel(nn.Module):
     def __init__(
         self,
         model_name: str,
         weights: str,
-        config_file: str,
     ) -> None:
         super(SegmentationModel, self).__init__()
 
         if model_name not in AVAILABLE_MODELS:
             raise ValueError("Input model not available, select one from list")
 
-        MetadataCatalog.get("hrc_train").set(thing_classes=['chair-back', 'chair-back-cover', 'chair-bracket', 'leg',
-                                                            'seat', 'top', 'leg-blue', 'leg-red'])
+        MetadataCatalog.get("hrc_train").set(thing_classes=['foot', 'leg', 'top'])
 
         # Create model
         # TODO: UPDATE timm model
         if model_name.find("timm") != -1:
             pass
         else:
-            self.model = DetectronModel(model_weights=weights, config_file=config_file)
+            self.model = DetectronModel(model_weights=weights)
 
         self.predictor = DefaultPredictor(self.model.config)
         self.pred_pub = rospy.Publisher("/seg/prediction", Prediction, queue_size=3)
         self.camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo)
-        rospy.Subscriber("/camera/color/image_raw", Image, self.callback)
-        # dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
-        # synch = message_filters.ApproximateTimeSynchronizer([rgb_sub, dep_sub], 5, 0.5)
-        # synch.registerCallback(self.callback)
         self.cv_bridge = CvBridge()
+        self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_1000)
+        self.aruco_params = cv2.aruco.DetectorParameters_create()
+        rospy.Subscriber("/camera/color/image_raw", Image, self.callback)
+        self.aruco_map = {
+            1: "small screw",
+            2: "nut",
+            3: "big screw",
+            4: "tray"
+        }
 
     def convert_depth_to_phys_coord_using_realsense(self, x, y, depth):
         _intrinsics = pyrealsense2.intrinsics()
@@ -283,28 +188,53 @@ class SegmentationModel(nn.Module):
             rgb (sensor_msgs.Image): Image message
         """
         rgb_img = self.cv_bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
-        # depth_img = self.cv_bridge.imgmsg_to_cv2(depth_map, desired_encoding="passthrough")
 
         (mask, centers, labels, scores) = self.model.full_output(rgb_img)
+        centers = np.array(centers)[np.array(scores) > 0.5]
+        labels = np.array(labels)[np.array(scores) > 0.5].tolist()
+
         outputs = self.predictor(rgb_img)
         v = Visualizer(rgb_img, metadata=MetadataCatalog.get("hrc_train"))
-        out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+        instances = outputs["instances"]
+        out = v.draw_instance_predictions(instances[instances.scores > 0.5].to("cpu"))
 
         pub_img = Prediction()
         pub_img.header = rgb.header
         pub_img.scores = scores
-        pub_img.centers = centers.ravel()
-        pub_img.labels = labels
         pub_img.labeled_img = self.cv_bridge.cv2_to_imgmsg(out.get_image(), encoding="passthrough")
+        pub_img.color_img = rgb
+
+        corners, ids, rejected = cv2.aruco.detectMarkers(rgb_img, self.aruco_dict, parameters=self.aruco_params)
+
+        aruco_centers = []
+        aruco_labels = []
+
+        if len(corners) > 0:
+            for (marker_corner, marker_id) in zip(corners, ids):
+                top_left, top_right, bottom_right, bottom_left = marker_corner.reshape((4, 2))
+                top_left = (int(top_left[0]), int(top_left[1]))
+                bottom_right = (int(bottom_right[0]), int(bottom_right[1]))
+
+                center_x = int((top_left[0] + bottom_right[0])/2.0)
+                center_y = int((top_left[1] + bottom_right[1])/2.0)
+                try:
+                    aruco_labels.append(self.aruco_map[marker_id[0]])
+                    aruco_centers.append((center_x, center_y))
+                except KeyError:
+                    continue
+            centers = np.vstack([centers, aruco_centers])
 
         position_x = []
         position_y = []
         position_z = []
+
         for center in centers:
-            vector = self.convert_depth_to_phys_coord_using_realsense(center[0], center[1], 1.45)
-            position_x.append(vector[0]+0.65)
-            position_y.append(-vector[1]-0.12)
+            vector = self.convert_depth_to_phys_coord_using_realsense(center[0], center[1], 1.4732)
+            position_x.append(-vector[1] + 0.66)
+            position_y.append(-vector[0] + 0.19)
             position_z.append(vector[2])
+        pub_img.centers = centers.ravel()
+        pub_img.labels = labels + aruco_labels
         pub_img.position_x = position_x
         pub_img.position_y = position_y
         pub_img.position_z = position_z
@@ -315,11 +245,9 @@ if __name__ == "__main__":
     rospy.init_node("segmentation")
     weights = rospy.get_param("model_weights")
     model_type = rospy.get_param("segmentation_model")
-    config = rospy.get_param("model_config")
     seg_model = SegmentationModel(
         model_name=model_type,
         weights=weights,
-        config_file=config,
     )
 
     while not rospy.is_shutdown():
