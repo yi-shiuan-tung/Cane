@@ -6,8 +6,9 @@ import rospy
 from cv_bridge import CvBridge
 from obj_inference.msg import Objects
 from segmentation.msg import Prediction
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 import matplotlib.pyplot as plt
+import pyrealsense2
 
 bridge = CvBridge()
 
@@ -27,47 +28,62 @@ def annotate_image(rgb, centers, position_x, position_y, position_z):
     return rgb
 
 
-def callback(pred, rgb,):
-    # sizes = np.array(inf.sizes)
-    # scores = np.array(inf.scores)
-    # labels = inf.labels
-    # positions = np.array(inf.positions).reshape(sizes.shape[0], 2)
-
-    rgb_img = bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
-    labeled_img = bridge.imgmsg_to_cv2(pred.labeled_img, desired_encoding="passthrough")
-
-    centers = np.array(pred.centers).reshape(-1, 2)
-    rgb = annotate_image(rgb_img, centers, pred.position_x, pred.position_y, pred.position_z)
-    divider = np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8)
-    concat = np.concatenate((labeled_img, divider, rgb), 1)
-    cv2.imshow("input", concat)
-    key = cv2.waitKey(200)
-    if key == 27 & 0xff:
-        cv2.destroyAllWindows()
-
-
 class Visualizer:
     r""" """
 
     def __init__(self):
-        pred_sub = message_filters.Subscriber("/seg/prediction", Prediction)
+        self.camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo)
+        rospy.Subscriber("/seg/prediction", Prediction, self.callback)
         # inf_sub = message_filters.Subscriber("/inference/obj_inference", Objects)
-        rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
+        # rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
         # dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
 
-        ts = message_filters.ApproximateTimeSynchronizer(
-            [pred_sub, rgb_sub],
-            20,
-            1.0,
-        )
-        ts.registerCallback(callback)
+        # ts = message_filters.ApproximateTimeSynchronizer(
+        #     [pred_sub, rgb_sub],
+        #     20,
+        #     1.0,
+        # )
+        # ts.registerCallback(callback)
+
+    def callback(self, pred):
+        # sizes = np.array(inf.sizes)
+        # scores = np.array(inf.scores)
+        # labels = inf.labels
+        # positions = np.array(inf.positions).reshape(sizes.shape[0], 2)
+
+        rgb = pred.color_img
+        rgb_img = bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
+        labeled_img = bridge.imgmsg_to_cv2(pred.labeled_img, desired_encoding="passthrough")
+
+        centers = np.array(pred.centers).reshape(-1, 2)
+        rgb = annotate_image(rgb_img, centers, pred.position_x, pred.position_y, pred.position_z)
+        divider = np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8)
+        concat = np.concatenate((labeled_img, divider, rgb), 1)
+        cv2.imshow("input", rgb)
+        cv2.setMouseCallback("input", self.click_callback)
+        key = cv2.waitKey(200)
+        if key == 27 & 0xff:
+            cv2.destroyAllWindows()
+
+    def convert_depth_to_phys_coord_using_realsense(self, x, y, depth):
+        _intrinsics = pyrealsense2.intrinsics()
+        _intrinsics.width = self.camera_info.width
+        _intrinsics.height = self.camera_info.height
+        _intrinsics.ppx = self.camera_info.K[2]
+        _intrinsics.ppy = self.camera_info.K[5]
+        _intrinsics.fx = self.camera_info.K[0]
+        _intrinsics.fy = self.camera_info.K[4]
+        _intrinsics.model = pyrealsense2.distortion.none
+        _intrinsics.coeffs = [i for i in self.camera_info.D]
+        result = pyrealsense2.rs2_deproject_pixel_to_point(_intrinsics, [x, y], depth)
+        return result
 
     # Define a function to show the image in an OpenCV Window
     def show_image(self, img):
         cv2.imshow("Image Window", img)
         cv2.waitKey(3)
 
-        # Define a callback for the Image message
+    # Define a callback for the Image message
     def image_callback(self, pred, img_msg):
         # log some info about the image topic
         rospy.loginfo(img_msg.header)
@@ -78,11 +94,13 @@ class Visualizer:
         # Show the converted image
         self.show_image(cv_image)
 
+    def click_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            vector = self.convert_depth_to_phys_coord_using_realsense(x, y, 1.4732)
+            print(round(-vector[1] + 0.66, 2), round(-vector[0] + 0.19, 2))
+
 
 if __name__ == "__main__":
-    viz = rospy.get_param("visualize")
-
-    if viz:
-        rospy.init_node("visualize")
-        viz = Visualizer()
-        rospy.spin()
+    rospy.init_node("visualize")
+    viz = Visualizer()
+    rospy.spin()
