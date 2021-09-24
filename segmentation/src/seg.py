@@ -193,15 +193,9 @@ class SegmentationModel(nn.Module):
         centers = np.array(centers)[np.array(scores) > 0.5]
         labels = np.array(labels)[np.array(scores) > 0.5].tolist()
 
-        outputs = self.predictor(rgb_img)
-        v = Visualizer(rgb_img, metadata=MetadataCatalog.get("hrc_train"))
-        instances = outputs["instances"]
-        out = v.draw_instance_predictions(instances[instances.scores > 0.5].to("cpu"))
-
         pub_img = Prediction()
         pub_img.header = rgb.header
         pub_img.scores = scores
-        pub_img.labeled_img = self.cv_bridge.cv2_to_imgmsg(out.get_image(), encoding="passthrough")
         pub_img.color_img = rgb
 
         corners, ids, rejected = cv2.aruco.detectMarkers(rgb_img, self.aruco_dict, parameters=self.aruco_params)

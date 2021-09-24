@@ -34,31 +34,13 @@ class Visualizer:
     def __init__(self):
         self.camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo)
         rospy.Subscriber("/seg/prediction", Prediction, self.callback)
-        # inf_sub = message_filters.Subscriber("/inference/obj_inference", Objects)
-        # rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
-        # dep_sub = message_filters.Subscriber("/camera/depth/image_rect_raw", Image)
-
-        # ts = message_filters.ApproximateTimeSynchronizer(
-        #     [pred_sub, rgb_sub],
-        #     20,
-        #     1.0,
-        # )
-        # ts.registerCallback(callback)
 
     def callback(self, pred):
-        # sizes = np.array(inf.sizes)
-        # scores = np.array(inf.scores)
-        # labels = inf.labels
-        # positions = np.array(inf.positions).reshape(sizes.shape[0], 2)
-
         rgb = pred.color_img
         rgb_img = bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
-        labeled_img = bridge.imgmsg_to_cv2(pred.labeled_img, desired_encoding="passthrough")
 
         centers = np.array(pred.centers).reshape(-1, 2)
         rgb = annotate_image(rgb_img, centers, pred.position_x, pred.position_y, pred.position_z)
-        divider = np.zeros((rgb.shape[0], 10, 3), dtype=np.uint8)
-        concat = np.concatenate((labeled_img, divider, rgb), 1)
         cv2.imshow("input", rgb)
         cv2.setMouseCallback("input", self.click_callback)
         key = cv2.waitKey(200)
@@ -97,7 +79,7 @@ class Visualizer:
     def click_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             vector = self.convert_depth_to_phys_coord_using_realsense(x, y, 1.4732)
-            print(round(-vector[1] + 0.66, 2), round(-vector[0] + 0.19, 2))
+            print("[%0.2f, %0.2f]" % (-vector[1] + 0.66, -vector[0] + 0.19))
 
 
 if __name__ == "__main__":
