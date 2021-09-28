@@ -43,7 +43,7 @@ class Visualizer:
         rgb = annotate_image(rgb_img, centers, pred.position_x, pred.position_y, pred.position_z)
         cv2.imshow("input", rgb)
         cv2.setMouseCallback("input", self.click_callback)
-        key = cv2.waitKey(200)
+        key = cv2.waitKey(1)
         if key == 27 & 0xff:
             cv2.destroyAllWindows()
 

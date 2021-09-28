@@ -77,6 +77,7 @@ class DetectronModel(DefaultPredictor, AbstractModel):
         cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
         cfg.MODEL.WEIGHTS = model_weights
         cfg.MODEL.ROI_HEADS.NUM_CLASSES = 3
+        cfg.MODEL.DEVICE = "cuda"
 
         return cfg
 
@@ -128,11 +129,10 @@ class DetectronModel(DefaultPredictor, AbstractModel):
     ):
         pred = self.forward(x)["instances"]
         centers = pred.pred_boxes.get_centers().cpu().numpy()
-        mask = pred.pred_masks.cpu().numpy().astype(np.uint8)
         labels = self.get_class_names(pred.pred_classes)
         scores = pred.scores.cpu().numpy()
 
-        return mask, centers, labels, scores
+        return centers, labels, scores
 
 
 class SegmentationModel(nn.Module):
@@ -189,7 +189,7 @@ class SegmentationModel(nn.Module):
         """
         rgb_img = self.cv_bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
 
-        (mask, centers, labels, scores) = self.model.full_output(rgb_img)
+        (centers, labels, scores) = self.model.full_output(rgb_img)
         centers = np.array(centers)[np.array(scores) > 0.5]
         labels = np.array(labels)[np.array(scores) > 0.5].tolist()
 
@@ -198,8 +198,7 @@ class SegmentationModel(nn.Module):
         pub_img.scores = scores
         pub_img.color_img = rgb
 
-        corners, ids, rejected = cv2.aruco.detectMarkers(rgb_img, self.aruco_dict, parameters=self.aruco_params)
-
+        corners, ids, _ = cv2.aruco.detectMarkers(rgb_img, self.aruco_dict, parameters=self.aruco_params)
         aruco_centers = []
         aruco_labels = []
 
