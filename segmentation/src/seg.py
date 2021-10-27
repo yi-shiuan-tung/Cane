@@ -161,7 +161,7 @@ class SegmentationModel(nn.Module):
         self.cv_bridge = CvBridge()
         self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_1000)
         self.aruco_params = cv2.aruco.DetectorParameters_create()
-        rospy.Subscriber("/camera/color/image_raw", Image, self.callback)
+        rospy.Subscriber("/camera/color/image_raw", Image, self.callback, queue_size=1)
         self.aruco_map = {
             1: "small screw",
             2: "nut",
@@ -195,8 +195,6 @@ class SegmentationModel(nn.Module):
 
         pub_img = Prediction()
         pub_img.header = rgb.header
-        pub_img.scores = scores
-        pub_img.color_img = rgb
 
         corners, ids, _ = cv2.aruco.detectMarkers(rgb_img, self.aruco_dict, parameters=self.aruco_params)
         aruco_centers = []

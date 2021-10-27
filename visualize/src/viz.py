@@ -33,10 +33,18 @@ class Visualizer:
 
     def __init__(self):
         self.camera_info = rospy.wait_for_message("/camera/color/camera_info", CameraInfo)
-        rospy.Subscriber("/seg/prediction", Prediction, self.callback)
+        # rospy.Subscriber("/seg/prediction", Prediction, self.callback)
+        pred_sub = message_filters.Subscriber("/seg/prediction", Prediction)
+        rgb_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
+        ts = message_filters.ApproximateTimeSynchronizer(
+            [pred_sub, rgb_sub],
+            10,
+            0.5,
+        )
+        ts.registerCallback(self.callback)
 
-    def callback(self, pred):
-        rgb = pred.color_img
+    def callback(self, pred, rgb):
+        # rgb = pred.color_img
         rgb_img = bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
 
         centers = np.array(pred.centers).reshape(-1, 2)
